@@ -29,7 +29,7 @@ class JenkinsClient(object):
         conn.request("GET", "/job/%s/lastBuild/api/json" % job_name,
                             headers=headers)
         response = conn.getresponse().read()
-        return json.loads(response)['result']
+        return json.loads(response)
 
     def basic_auth_header(self):
         user_token_raw = "%s:%s" % (self.user, self.password)

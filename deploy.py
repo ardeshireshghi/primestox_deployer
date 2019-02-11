@@ -3,8 +3,11 @@
 import socket
 import time
 import os
+import http.client
+import ssl
 from lib.aws.ec2 import client as ec2_client
 from lib.jenkins.client import JenkinsClient
+
 
 JENKINS_DEPLOY_JOB_NAME = 'deploy-primestox-prod'
 
@@ -19,6 +22,17 @@ def check_jenkins_up(server_ip):
     print('.', end='', flush=True)
 
     if result == 0:
+        conn = http.client.HTTPSConnection(
+          server_ip,
+          context=ssl._create_unverified_context()
+        )
+
+        conn.request('GET', '/')
+        res = conn.getresponse()
+
+        if res.status == 503:
+            time.sleep(10)
+            return check_jenkins_up(server_ip)
         return True
     else:
         time.sleep(10)
@@ -50,9 +64,12 @@ def run_deploy_job(jenkins_client):
 
     while True:
         status = jenkins_client.get_last_job_status(JENKINS_DEPLOY_JOB_NAME)
-        print("Jenkins deploy in progress, current state: %s" % status)
-        if status in ['FAILURE', 'SUCCESS']:
-            print("Jenkins deploy to LIVE finished with %s" % status)
+        print("Jenkins deploy in progress, current state: %s" %
+              status['result'])
+
+        if status['result'] in ['FAILURE', 'SUCCESS']:
+            print("Jenkins deploy to LIVE finished with %s" % status['result'])
+            print(status)
             break
 
         time.sleep(5)
@@ -67,7 +84,7 @@ def main():
         start_jenkins(jenkins_instance)
 
     instance_ip = jenkins_instance.public_ip_address
-    print("Jenkins instance is running")
+    print("Jenkins instance is running on https://%s" % instance_ip)
 
     print('Pinging if Jenkins app is running')
     check_jenkins_up(server_ip=instance_ip)
